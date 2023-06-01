@@ -1,0 +1,931 @@
+import C2R_logo_pre_trans from "../../../assets/images/click2remit/C2R_logo_pre1.png";
+import CustomInput from "../../../reusable/CustomInput";
+import FloatInput from "../../../reusable/FloatInput";
+import Header from "../Layouts/Header";
+import Main from "../Layouts/Main";
+import { EyeInvisibleOutlined, EyeOutlined, EyeTwoTone } from "@ant-design/icons";
+import Spinner from "../../../reusable/Spinner";
+import { Dropdown, Form, Input, Menu, notification } from "antd";
+import useHttp from "../../../hooks/useHttp";
+import { AuthAPI } from "../../../apis/AuthAPI";
+import { setSessionStorage } from "../../../services/utility/storage";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  login,
+  setIsLoggedIn,
+  setIsLoginDone,
+  setLastLogin,
+  setRecvCountryCode,
+  setRecvCurrencyCode,
+  setSendCountryCode,
+  setSendCurrencyCode,
+  setToken,
+  setUserFullName,
+  setUserId,
+  setUserKyc,
+} from "../../../reducers/userReducer";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { ProfileAPI } from "../../../apis/ProfileAPI";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ReceiverAPI } from "../../../apis/ReceiverAPI";
+import { ViAmericaAuthAPI } from "../../../apis/ViAmericaApi/Auth";
+import VerifyOtp from "../containers/VerifyOtp";
+import { checkPassword } from "../../../services/validations/password";
+import { validateEmailId } from "../../../services/validations/email";
+import { GuestAPI } from "../../../apis/GuestAPI";
+import MigratedCustomer from "../Pages/MigratedCustomer";
+import { COUNTRY } from "../../../services/Country";
+import ViaVerifyOTP from "../containers/ViaVerifyOTP";
+import Swal from "sweetalert2";
+
+let TimeoutId = null;
+export default function Login(props) {
+  const [form] = Form.useForm();
+  const emailRef = useRef(null);
+  const location = useLocation();
+  let navigate = useNavigate();
+  const hookLogin = useHttp(AuthAPI.login);
+  const dispatch = useDispatch();
+  // const [passwordVisible, setPasswordVisible] = useState(false);
+  const [loader, setLoader] = useState(0);
+  const websiteSettings = useSelector((state) => state.user.groupIdSettings.settings);
+  const hookUserRiskProfile = useHttp(ProfileAPI.userRiskProfile);
+  const hookGetSenderKycDetails = useHttp(ProfileAPI.getSenderKycDetails);
+  const hookViaSendOTP = useHttp(ViAmericaAuthAPI.viaSendOTP);
+  const hookGetReceiverLists = useHttp(ReceiverAPI.receiverLists);
+  const hookLoginViAmerica = useHttp(ViAmericaAuthAPI.login);
+  const hookSendOTP = useHttp(ProfileAPI.sendOTP);
+  const hookVerifyEmail = useHttp(ProfileAPI.emailVerification);
+  const hookGetMigratedUserDetails = useHttp(GuestAPI.getMigratedUserDetails);
+  const hookEditProfilePrimaryInfo = useHttp(GuestAPI.editProfilePrimaryInfo);
+  const hookSignUpViAmerica = useHttp(ViAmericaAuthAPI.signUp);
+  const hookCrnDetails = useHttp(AuthAPI.crnDetails);
+  const [state, setState] = useReducer((state, newState) => ({ ...state, ...newState }), {
+    loginData: {},
+    nextAction: "",
+    twofa: "N",
+    _showSignInForm: true,
+    otpType: "LG",
+    isMigrated: false,
+    verificationToken: "",
+    migratedUserDetails: {},
+    emailId: "",
+    migratePassword: "",
+    checkForMigrate: false,
+    disabledSignin: true,
+    verifyViaOTP: true,
+    userId: "",
+    eventId: "",
+    _isViaSendOTP: false,
+    otpExpiryTime:"",
+    onFinishData: {},
+    forceChangePassword: "false",
+  });
+  useEffect(() => {
+    emailRef.current.focus();
+  }, []);
+  useEffect(() => {
+    if (location?.state?.value?.email) {
+      setState({ checkForMigrate: true });
+      submitHandler(location.state.value);
+    }
+  }, [location?.state?.value?.email]);
+  // const visible= <EyeOutlined/>;
+  // const invisible = <EyeInvisibleOutlined/>
+  //  const [type, setType] = useState("password");
+  //  const [icon, setIcon] = useState("fa-solid fa-eye-slash");
+
+  //  const show = () => {
+  //    type === "password" ? setType("text") : setType("password");
+  //    icon ===  visible? setIcon(invisible) : setIcon(visible);
+  //  };
+  const submitHandler = (value, migratePass) => {
+    setState({ onFinishData: value });
+    const payload = {
+      requestType: "LOGIN",
+      loginId: value?.email ? value?.email : state?.emailId,
+      password: value?.passwords ? value?.passwords : migratePass,
+      noofAttempts: "1",
+      custType: "SEND",
+      referer: "",
+      emailVeriFlag: true,
+      isMobileVerified: "N",
+    };
+    setLoader((prevState) => prevState + 1);
+    hookLogin.sendRequest(payload, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status == "S") {
+        setState({ forceChangePassword: data.forceChangePassword });
+        if (state.checkForMigrate == true || location?.state?.value?.email) {
+          SignUpViaAmerica(data);
+        } else if (data.regCountryCode == "US") {
+          loginViaAmerica(data);
+        } else {
+          userRiskProfile(data);
+          storeLoginData(data);
+        }
+      } else {
+        if (data.errorList) {
+          notification.error({ message: data.errorList[0].error });
+
+          let errors = [];
+          data.errorList.forEach((error, i) => {
+            let errorData = {
+              name: error.field,
+              errors: [error.error],
+            };
+            errors.push(errorData);
+          });
+
+          if (errors.length > 0) form.setFields(errors);
+        } else {
+          if (data.errorMessage === "Email verification is pending") {
+            notification.error({
+              message: data.errorMessage,
+              duration: 0,
+              description: (
+                <>
+                  If you have not received the verification mail, please{" "}
+                  <button
+                    className="btn btn-link p-0"
+                    onClick={() => {
+                      emailVerify(value.email);
+                    }}
+                  >
+                    <b>click here</b>
+                  </button>{" "}
+                  to resend verification link on your email.
+                </>
+              ),
+            });
+          } else {
+            if (data.errorMessage.includes("valid credentials")) {
+              notification.error({
+                message:
+                  "Your user ID is deactivated. To re-activate your user ID please call us on +91-22-66053825 or send an email to click2remit@kotak.com.",
+              });
+            } else {
+              notification.error({
+                message: data.errorMessage ? data.errorMessage : "Login failed.",
+              });
+            }
+          }
+        }
+      }
+    });
+  };
+
+  const emailVerify = (email) => {
+    let payload = {
+      requestType: "VERIFICATIONEMAIL",
+      loginId: email,
+      // userId: data.userId,
+      emailId: email,
+      emailVeriFlag: true,
+    };
+    setLoader((prevState) => prevState + 1);
+    hookVerifyEmail.sendRequest(payload, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status == "S") {
+        notification.destroy();
+        notification.success({
+          message: data.message,
+        });
+        // props.setState({activeStepForm:5});
+        // navigate("/verify-email?token=sdfsdfsdf56sdf5s6df5sd6f5sd6");
+      } else {
+        notification.error({
+          message: data.errorMessage ? data.errorMessage : "Verify email failed.",
+        });
+      }
+    });
+  };
+  const SignUpViaAmerica = (data) => {
+    setLoader((prevState) => prevState + 1);
+    hookSignUpViAmerica.sendRequest(
+      {
+        requestType: "SIGNUP",
+        userId: data.userId,
+      },
+      function (dataVia) {
+        setLoader((prevState) => prevState - 1);
+        if (dataVia.message == "OTP Sent" && dataVia.eventId) {
+          // viaSendOTP(data);
+          notification.success({ message: "OTP has been sent to your registered mobile number" });
+          setState({
+            userId: data.userId,
+            _isViaSendOTP: true,
+            _showSignInForm: false,
+            verifyViaOTP: false,
+            eventId: dataVia.eventId,
+          });
+        } else {
+          if (dataVia.status === "S") {
+            notification.success({
+              message: "Thank you. You are successfully registered.",
+            });
+            loginViaAmerica(data);
+          } else {
+            // notification.error({ message: dataVia.errorMessage });
+            loginViaAmerica(data);
+          }
+        }
+      },
+    );
+  };
+  const loginViaAmerica = (data) => {
+    setLoader((prevState) => prevState + 1);
+    hookLoginViAmerica.sendRequest(
+      {
+        requestType: "LOGIN",
+        userId: data.userId,
+      },
+      function (dataV) {
+        notification.destroy();
+        setLoader((prevState) => prevState - 1);
+        if (dataV.message == "OTP Sent" && dataV.eventId) {
+          // viaSendOTP(data);
+          notification.success({ message: "OTP has been sent to your registered mobile number" });
+          setState({
+            userId: data.userId,
+            _isViaSendOTP: true,
+            _showSignInForm: false,
+            verifyViaOTP: false,
+            eventId: dataV.eventId,
+          });
+        } else {
+          if (dataV.status === "S") {
+            setState({ loginData: data });
+            // if (state.checkForMigrate == true) {
+            //   editProfilePrimaryInfo();
+            // } else {
+            if (state.twofa == "N") {
+              userRiskProfile(data);
+              // storeLoginData(data);
+              sendOTP(data);
+              // getReceiverLists(data);
+            } else if (state.checkForMigrate == true) {
+              userRiskProfile(data);
+              storeLoginData(data);
+            } else {
+              userRiskProfile(data);
+              sendOTP(data);
+            }
+            // }
+
+            window.sessionStorage.setItem("loginTokenId", dataV.loginTokenId);
+            window.sessionStorage.setItem("idSenderGlobal", dataV.idSenderGlobal);
+          } else {
+            notification.error({
+              message: dataV.errorMessage ? dataV.errorMessage : "Via login failed.",
+            });
+          }
+        }
+      },
+    );
+  };
+  const getSenderKycDetails = (data) => {
+    const payload = {
+      requestType: "SENDERKYCDTLS",
+      userId: data.userId,
+    };
+    setLoader((prevState) => prevState + 1);
+    hookGetSenderKycDetails.sendRequest(payload, function (dataV) {
+      setLoader((prevState) => prevState - 1);
+      if (dataV.status == "S") {
+        if (dataV.isMobileVerified == "N") {
+          //actual N
+          viaSendOTP(data);
+        } else {
+          getCRNDetails(data);
+        }
+        // navigate("/new-transaction");
+      }
+    });
+  };
+  const viaSendOTP = (data) => {
+    const payload = {
+      requestType: "VIASENDOTP",
+      userId: data.userId,
+      otpType: "SEND",
+      optionID: "phone", //pass email or phone
+    };
+    // const payload = {
+    //   requestType: "VIASENDOTP",
+    //   userId: data.userId,
+    //   otpType: "SMS", //MAIL,LOGINMFA, SMS
+    //   // phone: "+449769415951",
+    //   phone: "+918329567490",
+    //   // phone: `+${data.mobileNo.replace(/-/g, '')}`,
+    //   // emailId: state.emailId,
+    // };
+
+    setLoader((prevState) => prevState + 1);
+    hookViaSendOTP.sendRequest(payload, function (dataV) {
+      setLoader((prevState) => prevState - 1);
+      if (dataV.status == "S") {
+        notification.success({ message: "OTP has been sent to your registered mobile number" });
+        setState({ _showSignInForm: false, verifyViaOTP: false, eventId: dataV.eventId });
+      } else {
+        notification.error({
+          message: dataV.errorMessage ? dataV.errorMessage : "Via send OTP failed",
+        });
+      }
+    });
+  };
+  const getCRNDetails = (dataV) => {
+    let payload = {
+      requestType: "CRNDETAILS",
+      crnNumber: state.emailId ? state.emailId : location?.state?.value?.email, //"dummy crnNumber": "100881179",LOGINID
+      bankAcctStatusCode: "Y",
+      apiType: "LOGIN",
+    };
+    setLoader((prevState) => prevState + 1);
+    hookCrnDetails.sendRequest(payload, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status === "S") {
+        dispatch(setIsLoginDone(false));
+        if (state.forceChangePassword == "true") {
+          Swal.fire({
+            // title: "Success",
+            text: "Your password has been expired please click ok to reset",
+            // icon: "success",
+            confirmButtonColor: "#2dbe60",
+            allowOutsideClick: false,
+          }).then((result) => {
+            if (result.isConfirmed) {
+              navigate("/reset-password", { state: { sidebar: false, centerCls: true } });
+            }
+          });
+        } else {
+          notification.success({
+            message: `WELCOME ${dataV.firstName} ${dataV.lastName}`,
+          });
+          navigate("/new-transaction");
+        }
+      } else {
+        notification.error({
+          message: data.errorMessage
+            ? data.errorMessage
+            : "Access restricted. Please reach us at click2remit@kotak.com or 02266053825 for more information ",
+        });
+      }
+    });
+  };
+  const userRiskProfile = (loginData) => {
+    const userRiskProfilePayload = {
+      requestType: "RISKPROFILE",
+      userId: loginData.userId,
+      ___token: loginData.token,
+    };
+    setLoader((prevState) => prevState + 1);
+    hookUserRiskProfile.sendRequest(userRiskProfilePayload, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status == "S") {
+        console.log("STEPS ==> ", "1");
+        setState({ nextAction: data.nextAction });
+        dispatch(setUserKyc(data.nextAction));
+      }
+    });
+  };
+
+  const storeLoginData = (loginData) => {
+    dispatch(setIsLoginDone(true));
+    // setState({ loginData: { ...loginData } });
+    console.log("STEPS ==> ", "2");
+    const objLoginData = { ...loginData, ...websiteSettings };
+    props?.manageAuth("logintoken", loginData);
+    saveUser(objLoginData, state.nextAction);
+
+    if (state.checkForMigrate == true || location?.state?.value?.email) {
+      editProfilePrimaryInfo(objLoginData);
+    } else if (objLoginData.regCountryCode !== "US") {
+      getReceiverLists(objLoginData);
+    }
+    if (state.nextAction == "KYC_COMPLETE") {
+      setTimeout(() => {}, 500);
+    } else {
+      // can comment this line, not usable at all
+      // setTimeout(() => {
+      //   Navigate("/new-transaction");
+      // }, 500);
+    }
+  };
+
+  const saveUser = (data, nextAction) => {
+    // for session storage
+    if (data.refreshPage) {
+      setSessionStorage("accessToken", data.token);
+      setSessionStorage("isLoggedIn", true);
+      setSessionStorage("regCountryCode", data.regCountryCode);
+
+      setSessionStorage("userID", data.userId);
+      setSessionStorage("userFullName", data.firstName + " " + data.lastName);
+    } else {
+      dispatch(setSendCountryCode(data.regCountryCode));
+      dispatch(setSendCurrencyCode(COUNTRY[data.regCountryCode].countryCurrency));
+      dispatch(setRecvCountryCode("IN"));
+      dispatch(setRecvCurrencyCode("INR"));
+      dispatch(
+        login({
+          lastLogin: data.lastLoginTimeIST,
+          userID: data.userId,
+          userFullName: data.firstName + " " + data.lastName,
+          accessToken: data.token,
+          isLoggedIn: true,
+          regCountryCode: data.regCountryCode,
+        }),
+      );
+
+      // dispatch(setLastLogin(data.lastLoginTimeIST));
+      // dispatch(setUserId(data.userId));
+      // dispatch(setUserKyc(nextAction));
+      // dispatch(setUserFullName(data.firstName + " " + data.lastName));
+      // dispatch(setToken(data.token));
+      // dispatch(setIsLoggedIn(true));
+    }
+    // if (!location?.state?.value?.email) {
+    getSenderKycDetails(data);
+    // }
+  };
+  const getReceiverLists = (data) => {
+    // navigate("/new-transaction");
+    // const payload = {
+    //   requestType: "GETRECVLIST",
+    //   userId: data.userId,
+    //   favouriteFlag: "",
+    //   startIndex: "0",
+    //   recordsPerRequest: "",
+    //   search: "",
+    //   statusFlag: "",
+    // };
+    // setLoader((prevState) => prevState + 1);
+    // hookGetReceiverLists.sendRequest(payload, function (data) {
+    //   setLoader((prevState) => prevState - 1);
+    //   if (data.status == "S") {
+    //     if (data.responseData.length == 0) {
+    //       navigate("/create-account", { state: { activeStepForm: 7 } });
+    //     } else {
+    //       navigate("/new-transaction");
+    //     }
+    //     // let verifiedStatus = "";
+    //     // // setRecipientListTable(true);
+    //     // let resData = [];
+    //     // let stateList = [];
+    //     // if (data.responseData[0].status == "V") {
+    //     //   verifiedStatus = "Verified";
+    //     // } else {
+    //     //   verifiedStatus = data.status;
+    //     // }
+    //     // data.responseData.forEach((detail, i) => {
+    //     //   let data = {
+    //     //     key: i,
+    //     //     name: `${detail.firstName} ${detail.lastName}`,
+    //     //     bankName: `${detail.bankName}`,
+    //     //     accountNo: `${detail.accountNo}`,
+    //     //     status: `${verifiedStatus}`,
+    //     //     recordToken: `${detail.recordToken}`,
+    //     //     nickName: `${detail.nickName}`,
+    //     //     bankBranch: `${detail.bankBranch}`,
+    //     //     city: `${detail.city}`,
+    //     //     country: detail.countryCode == "IN" ? "India" : "",
+    //     //     // country:`${detail.countryCode}`,
+    //     //     state: `${detail.state}`,
+    //     //     accountType: accountType(detail.accountType),
+    //     //   };
+    //     //   resData.push(data);
+    //     //   stateList.push(detail.state);
+    //     // });
+    //     // let newFilteredStateList = [...new Set(stateList)];
+    //     // setState({
+    //     //   filteredStateList: newFilteredStateList,
+    //     //   receiverLists: resData,
+    //     //   filteredRecieverList: resData,
+    //     // });
+    //     // setContentRender(true);
+    //   } else {
+    //     navigate("/create-account", { state: { activeStepForm: 7 } });
+    //     // setRecipientListTable(false);
+    //     // setContentRender(true);
+    //   }
+    // });
+  };
+  const sendOTP = (data, check) => {
+    const OTPData = {
+      requestType: "SENDOTP",
+      otpType: state.otpType,
+      userId: data.userId,
+      otpOption: "SM",
+      otpService: "EMAIL",
+    };
+    setLoader((prevState) => prevState + 1);
+    hookSendOTP.sendRequest(OTPData, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status == "S") {
+        setState({otpExpiryTime:data.otpExpiryTime})
+        notification.success({
+          message:
+            "OTP has been sent to your registered email address. Please check and enter correct OTP to proceed.",
+        });
+        if (state?.checkForMigrate) {
+          setState({ isMigrated: false, verificationToken: data.verificationToken });
+          setState({
+            _showSignInForm: false,
+            verifyViaOTP: true,
+            // _isShowOTPBOX: true,
+            // isModalVisible: true,
+          });
+        } else {
+          setState({
+            verificationToken: data.verificationToken,
+            _showSignInForm: false,
+            verifyViaOTP: true,
+            // _isShowOTPBOX: true,
+            // isModalVisible: true,
+          });
+        }
+      } else {
+        notification.error({ message: data.errorMessage ? data.errorMessage : "Send OTP failed." });
+      }
+    });
+  };
+  const getMigratedUserDetails = (e) => {
+    if (e.target.value.toLowerCase().includes("@")) {
+      setState({ emailId: e.target.value });
+      let payload = {
+        requestType: "IFRKYC",
+        loginId: e.target.value, //can also pass cif no.
+      };
+      setLoader((prevState) => prevState + 1);
+      hookGetMigratedUserDetails.sendRequest(payload, function (data) {
+        setLoader((prevState) => prevState - 1);
+        setState({ disabledSignin: false });
+        if (data.status == "S") {
+          notification.success({
+            message: data.message ? data.message : "Migrated user verified.",
+          });
+          if (data.isMigretedCustomer == "Y") {
+            // sendOTP(data, { isMigrated: true });
+            setState({ isMigrated: true, migratedUserDetails: { ...data }, checkForMigrate: true });
+          }
+        } else {
+          setState({ checkForMigrate: false });
+          // notification.error({ message: data.errorMessage });
+        }
+      });
+    }
+  };
+  // const getCRNDetails = (_loginId) => {
+  //   let payload = {
+  //     requestType: "CRNDETAILS",
+  //     crnNumber: _loginId, //"dummy crnNumber": "100881179",LOGINID
+  //     bankAcctStatusCode: "Y",
+  //     apiType: "LOGIN",
+  //   };
+  //   setLoader((prevState) => prevState + 1);
+  //   hookCrnDetails.sendRequest(payload, function (data) {
+  //     setLoader((prevState) => prevState - 1);
+  //     if (data.status === "S") {
+  //     } else {
+  //       // notification.error({ message: data.errorMessage });
+  //     }
+  //   });
+  // };
+  // const loginHandler = (value, migratePass) => {
+  //   const payload = {
+  //     requestType: "LOGIN",
+  //     loginId: value?.email ? value?.email : state?.emailId,
+  //     password: value?.passwords ? value?.passwords : migratePass,
+  //     noofAttempts: "1",
+  //     custType: "SEND",
+  //     referer: "",
+  //     emailVeriFlag: true,
+  //   };
+  //   setLoader((prevState) => prevState + 1);
+  //   hookLogin.sendRequest(payload, function (data) {
+  //     setLoader((prevState) => prevState - 1);
+  //     if (data.status == "S") {
+  //       // getCRNDetails(value?.email ? value?.email : state?.emailId);
+  //       if (state.checkForMigrate == true) {
+  //         SignUpViaAmerica(data);
+  //       } else if (data.regCountryCode == "US") {
+  //         loginViaAmerica(data);
+  //       } else {
+  //         userRiskProfile(data);
+  //         storeLoginData(data);
+  //       }
+  //     } else {
+  //       if (data.errorList) {
+  //         notification.error({ message: data.errorList[0].error });
+
+  //         let errors = [];
+  //         data.errorList.forEach((error, i) => {
+  //           let errorData = {
+  //             name: error.field,
+  //             errors: [error.error],
+  //           };
+  //           errors.push(errorData);
+  //         });
+
+  //         if (errors.length > 0) form.setFields(errors);
+  //       } else {
+  //         if (data.errorMessage === "Email verification is pending") {
+  //           notification.error({
+  //             message: data.errorMessage,
+  //             duration: 0,
+  //             description: (
+  //               <>
+  //                 If you have not received the verification mail, please{" "}
+  //                 <button
+  //                   className="btn btn-link p-0"
+  //                   onClick={() => {
+  //                     emailVerify(value.email);
+  //                   }}
+  //                 >
+  //                   <b>click here</b>
+  //                 </button>{" "}
+  //                 to resend verification link on your email.
+  //               </>
+  //             ),
+  //           });
+  //         } else {
+  //           notification.error({ message: data.errorMessage });
+  //         }
+  //       }
+  //     }
+  //   });
+  // };
+  const editProfilePrimaryInfo = (objLoginData) => {
+    const payload = {
+      requestType: "EDITPROFILEPRIMARY",
+      pageName: "MGLOGIN",
+      gender: state.migratedUserDetails.gender
+        ? state.migratedUserDetails.gender
+        : location?.state?.migratedUsr.gender
+        ? location?.state?.migratedUsr.gender
+        : "M",
+      dob: state.migratedUserDetails.dob
+        ? state.migratedUserDetails.dob
+        : location?.state?.migratedUsr.dob
+        ? location?.state?.migratedUsr.dob
+        : "",
+      tnc: "N",
+      userId: state.migratedUserDetails.userId
+        ? state.migratedUserDetails.userId
+        : location?.state?.migratedUsr.userId,
+      citizenship: "US",
+      industry: state.migratedUserDetails.industry
+        ? state.migratedUserDetails.industry
+        : location?.state?.migratedUsr.industry,
+      profession: state.migratedUserDetails.profession
+        ? state.migratedUserDetails.profession
+        : location?.state?.migratedUsr.profession,
+      // pep: state.migratedUserDetails.pep
+      //   ? state.migratedUserDetails.pep
+      //   : location?.state?.migratedUsr.pep,
+      // sin: state.migratedUserDetails.sin
+      //   ? state.migratedUserDetails.sin
+      //   : location?.state?.migratedUsr.sin,
+      isMigratedUser: "V", //actual V
+    };
+    setLoader((prevState) => prevState + 1);
+    hookEditProfilePrimaryInfo.sendRequest(payload, function (data) {
+      setLoader((prevState) => prevState - 1);
+      if (data.status == "S") {
+        notification.success({ message: data.message });
+        // navigate("/new-transaction");
+        // if (state.twofa == "N") {
+        //   userRiskProfile(data);
+        //   storeLoginData(data);
+        //   getReceiverLists(data);
+        // } else {
+        //   setState({ loginData: data });
+        //   userRiskProfile(data);
+        //   sendOTP(data);
+        // }
+        // getReceiverLists(objLoginData);
+      } else {
+        notification.error({
+          message: data.errorMessage ? data.errorMessage : "Edit profile primary info failed.",
+        });
+      }
+    });
+  };
+
+  const handlePasswordChange = () => {
+    clearTimeout(TimeoutId);
+    let t = setTimeout(function () {
+      getMigratedUserDetails({
+        target: {
+          value: emailRef.current.input.value,
+        },
+      });
+    }, 2000);
+    TimeoutId = t;
+  };
+
+  return (
+    <Main sidebar={false}>
+      {!state.isMigrated ? (
+        <div className="row h-100">
+          <div className=" col-lg-7 col-md-7 col-sm-12 mb-lg-5 pb-lg-5 d-none d-sm-block">
+            {/* <div className="click2remit-logo mx-auto">
+              <img className="img-responsive mx-auto" src={C2R_logo_pre_trans} width="100%" />
+            </div>
+            <p className="font-16 fw-bold text-center mt-2">
+              A Platform by Kotak Mahindra <br />
+              Bank. Hassle free transfer to
+              <br />
+              50+ countries
+            </p> */}
+            <div className="home-banner-section">
+              {/* <h1>
+                A Platform by <br />
+                Kotak Mahindra Bank.{" "}
+              </h1> */}
+              {/* <h2>Hassle free transfer to 50+ countries</h2> */}
+              <ul
+              className="d-flex justify-content-center gap-5 px-md-4"
+              style={{ listStyleType: "disc", fontSize: "32px",fontWeight:"bold" }}
+            >
+              <li>Simple</li>
+              <li>Secure</li>
+              <li>Swift</li>
+            </ul>
+            <ul  className="d-flex justify-content-center px-md-1"
+              style={{ fontSize: "25px" }}>
+              <li>A platform for all your remittances to India</li>
+            </ul>
+            </div>
+            <img
+              className="w-100"
+              src={require(`../../../assets/images/click2remit/money-transfer-globe.png`)}
+            />
+            {/* <ul
+            className="d-flex justify-content-center gap-5 px-md-3"
+            style={{ listStyleType: "disc", fontSize: "25px" }}
+          >
+            <li>Simple</li>
+            <li>Secure</li>
+            <li>Swift</li>
+          </ul> */}
+          </div>
+          <div className="col-12 col-md-5 col-lg-5 ">
+            <Spinner spinning={loader === 0 ? false : true}>
+              {state._showSignInForm ? (
+                <div className="CR-login-form">
+                  <Form
+                    form={form}
+                    onFinish={(values) => {
+                      // setState({ twofa: "N" });
+                      submitHandler(values);
+                    }}
+                  >
+                    <ul className="row">
+                      {/* <li className="text-center d-none d-xs-block">
+                          <img src="images/C2R-mobile.svg" alt="" />
+                        </li> */}
+                      <li className="col-md-12 col-sm-12 col-lg-12 mb-4">
+                        <h4 className="text-black m-text-center">Sign in to your account</h4>
+                      </li>
+                      <li className="col-md-12 col-sm-12 col-lg-12">
+                        <CustomInput
+                          showLabel={false}
+                          name="email"
+                          label="Email Address"
+                          validationRules={[
+                            ({ getFieldValue }) => ({
+                              validator(rule, value) {
+                                let message = "";
+                                let obj = validateEmailId(value ? value : "");
+                                message = obj.message;
+                                if (obj.status === "S") {
+                                  return Promise.resolve();
+                                }
+                                return Promise.reject(message);
+                              },
+                            }),
+                          ]}
+                        >
+                          <FloatInput
+                            placeholder="Email Address"
+                            reference={emailRef}
+                            // onChange={(e) => setState({ emailId: e.target.value })}
+                            onBlur={getMigratedUserDetails}
+                            onFocus={() => setState({ disabledSignin: true })}
+                          />
+                        </CustomInput>
+                      </li>
+                      <li className="col-md-12 col-sm-12 col-lg-12">
+                        <CustomInput
+                          // min={10}
+                          // max={20}
+                          showLabel={false}
+                          name="passwords"
+                          label="Password"
+                          type="password"
+                          // required
+                          validationRules={[
+                            ({ getFieldValue }) => ({
+                              validator(rule, value) {
+                                let message = "";
+                                let obj = checkPassword(value ? value : "");
+                                message = obj.message;
+                                if (obj.status === "S") {
+                                  return Promise.resolve();
+                                }
+                                return Promise.reject(message);
+                              },
+                            }),
+                          ]}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            return false;
+                          }}
+                          onCopy={(e) => {
+                            e.preventDefault();
+                            return false;
+                          }}
+                          onCut={(e) => {
+                            e.preventDefault();
+                            return false;
+                          }}
+                        >
+                          <FloatInput
+                            type="password"
+                            onChange={handlePasswordChange}
+                            placeholder="Password"
+                          />
+                        </CustomInput>
+                      </li>
+                      <li></li>
+
+                      <li className="col-md-12 col-sm-12 col-lg-12 text-end mb-3 d-flex justify-content-end flex-column align-items-end">
+                        <Link to="/forgot-password" className="CR-blue-link  mb-1 CR-font-12">
+                          FORGOT PASSWORD?
+                        </Link>
+
+                        <Link to="/unlock-account" className="CR-blue-link CR-font-12">
+                          UNLOCK ACCOUNT?
+                        </Link>
+                      </li>
+                      <li className="col-md-12 col-sm-12 col-lg-12">
+                        <button
+                          htmlType="submit"
+                          className="btn CR-primary-btn mb-3"
+                          onClick={() => setState({ twofa: "Y" })}
+                          disabled={state.disabledSignin}
+                        >
+                          SIGN IN
+                        </button>
+                      </li>
+                      {/* 
+                      <li className="col-lg-12 col-md-12 col-sm-12 text-center">
+                        <p className="CR-font-14">or</p>
+                      </li>
+                      <li className="col-md-12 col-sm-12 col-lg-12">
+                        <button
+                          htmlType="submit"
+                          className="btn btn-outline-primary CR-outline-primary-btn"
+                          onClick={() => setState({ twofa: "Y" })}
+                        >
+                          SIGN IN USING OTP
+                        </button>
+                      </li> */}
+                      <li className="col-md-12 col-sm-12 col-lg-12 text-center py-2">
+                        Don't have an account?<br/>
+                        <Link to={"/create-account"}>Create an account</Link>
+                      </li>
+                    </ul>
+                  </Form>
+                </div>
+              ) : state.verifyViaOTP ? (
+                <VerifyOtp
+                  state={state}
+                  setState={setState}
+                  storeLoginData={storeLoginData}
+                  getReceiverLists={getReceiverLists}
+                  otpType={state.otpType}
+                  useFor="login"
+                  appState={props.appState}
+                />
+              ) : (
+                <ViaVerifyOTP
+                  state={state}
+                  setState={setState}
+                  useFor="login"
+                  otpType="SMS"
+                  submitHandler={submitHandler}
+                />
+              )}
+            </Spinner>
+          </div>
+        </div>
+      ) : (
+        <Spinner spinning={loader === 0 ? false : true}>
+          <MigratedCustomer state={state} setState={setState} submitHandler={submitHandler} />
+        </Spinner>
+      )}
+    </Main>
+  );
+}
