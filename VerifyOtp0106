@@ -1,0 +1,666 @@
+import Back_arrow from "../../../assets/images/click2remit/Back_arrow.svg";
+import C2R_mobile from "../../../assets/images/click2remit/C2R-mobile.svg";
+import OtpInput from "react-otp-input";
+import { config } from "../../../config";
+import { Form, Input, Modal, notification } from "antd";
+import { useEffect, useReducer, useRef, useState } from "react";
+import moment from "moment";
+import { useSelector } from "react-redux";
+import { decrypt, encrypt, publickey } from "../../../helpers/makeHash";
+import { GuestAPI } from "../../../apis/GuestAPI";
+import useHttp from "../../../hooks/useHttp";
+import { AuthAPI } from "../../../apis/AuthAPI";
+import Spinner from "../../../reusable/Spinner";
+import { ViAmericaAuthAPI } from "../../../apis/ViAmericaApi/Auth";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ProfileAPI } from "../../../apis/ProfileAPI";
+
+export default function VerifyOtp(props) {
+  const OtpInputFocus = useRef(null);
+  let OTPExpTime = props?.state?.otpExpiryTime ? props.state.otpExpiryTime : "2";
+  const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hookVerifyOTP = useHttp(GuestAPI.verifyOTP);
+  const hookReSendOTP = useHttp(GuestAPI.reSendOTP);
+  const hookSignUpViAmerica = useHttp(ViAmericaAuthAPI.signUp);
+  const hookSignUp = useHttp(AuthAPI.signUp);
+  const hookVerifyEmail = useHttp(ProfileAPI.emailVerification);
+  const AuthReducer = useSelector((state) => state.user);
+
+  const [loader, setLoader] = useState(false);
+  const [reverseTimer, setReverseTimer] = useState(`${OTPExpTime}m 00s`);
+  const [intervalID, setInterID] = useState();
+  const [state, setState] = useReducer((state, newState) => ({ ...state, ...newState }), {
+    isModalVisible: false,
+    OTPErrorMsg: "",
+    OTPValue: "",
+    _otpErrMsg: false,
+    _showOtpErrMsg: false,
+    _OTPErrMessage: "Please Enter Complete OTP",
+    otpType: "",
+    accountNo: "",
+  });
+  const otpInputStyle = {
+    height: "56px",
+    gap: "11px",
+    width: "47px",
+    borderRadius: "8px",
+    backgroundColor: "#f0f8ff",
+    border: "1px solid #d3dfeb",
+    fontSize: "1.5rem",
+    fontColor: "black",
+    fontWeight: "700",
+    textAlign: "center",
+  };
+  const onlyNumberKey = (val) => {
+    var rgx = /^[0-9]*$/;
+    return val.match(rgx);
+  };
+
+  useEffect(() => {
+    reverseTimerOnLoad();
+    if (props.bookTransaction) {
+      setState({ otpType: "TX" });
+    } else if (props?.useFor == "login" || props.useFor == "migrated_customer") {
+      setState({ otpType: "LG" });
+    } else if (props.useFor === "edit_receiver") {
+      setState({ otpType: "TI" });
+    } else if (props.useFor === "delete_beneficiary") {
+      setState({ otpType: "DR" });
+    } else if (props?.editProfile) {
+      setState({ otpType: "EP" });
+    } else if (props.saveReceiver) {
+      setState({ otpType: "RA" });
+    } else if (props.useFor == "forgot_password") {
+      setState({ otpType: "FP" });
+    } else if (props.useFor === "forgot_userId") {
+      setState({ otpType: "FL" });
+    } else if (props.useFor === "unlock_account") {
+      setState({ otpType: "UL" });
+    } else if (props.useFor === "reset_password") {
+      setState({ otpType: "CP" });
+    } else {
+      setState({ otpType: "UL" });
+    }
+    if (props?.state?.value?.accountNo) {
+      setState({ accountNo: props?.state?.value?.accountNo });
+    } else if (props?.state?.beneBankAndAcctNo?.accountNo) {
+      setState({ accountNo: props?.state?.beneBankAndAcctNo?.accountNo });
+    } else {
+      setState({ accountNo: props.receiverData });
+    }
+  }, []);
+  useEffect(() => {
+    if (state._showOtpErrMsg) {
+      if (state.OTPValue.length === 6) {
+        setState({ _otpErrMsg: false });
+      } else if (state.OTPValue.length !== 0) {
+        setState({ _otpErrMsg: true });
+      }
+    }
+  }, [state.OTPValue]);
+  // useEffect(() => {
+  //   if (state.box1 || state.box2 || state.box3 || state.box4 || state.box5 || state.box6) {
+  //     let OTPValue = `${state.box1}${state.box2}${state.box3}${state.box4}${state.box5}${state.box6}`;
+  //     setState({
+  //       OTPValue: OTPValue,
+  //     });
+  //   }
+  // }, [state.box1, state.box2, state.box3, state.box4, state.box5, state.box6]);
+  // useEffect(() => {
+  //   if (props?.saveReceiver) {
+  //     props.saveReceiver();
+  //   }
+  // }, [props?.state?.verificationToken]);
+  const reverseTimerOnLoad = () => {
+    clearInterval(intervalID);
+
+    let validityAuctionEndTime = moment().add(OTPExpTime, "minutes");
+    const second = 1000,
+      minute = second * 60,
+      hour = minute * 60,
+      day = hour * 24;
+
+    let countDown = new Date(`${validityAuctionEndTime}`).getTime();
+
+    let letintervalID = setInterval(function () {
+      let now = new Date().getTime(),
+        distance = countDown - now;
+
+      var getDay = Math.floor(distance / day);
+
+      var getHour = Math.floor((distance % day) / hour);
+
+      var getMinute = Math.floor((distance % hour) / minute);
+
+      var secound = Math.floor((distance % minute) / second);
+      let getSecound = secound > 9 ? secound : 0 + secound;
+
+      let cDay = getDay !== 0 ? `${getDay}d` : "";
+      let cHour = getHour !== 0 ? `${getHour}h` : "";
+      let cMinute = getMinute !== 0 ? `${getMinute}m` : "";
+      let cSecound = getSecound !== 0 ? `${getSecound}s` : "";
+      let timer = `${cDay} ${cHour} ${cMinute} ${cSecound}`;
+
+      if (distance <= 0) {
+        clearInterval(intervalID);
+      } else {
+        setReverseTimer(timer);
+      }
+    }, second);
+    setInterID(letintervalID);
+  };
+  const submitHandler = (value) => {
+    form.setFields([{ name: "otp", errors: [] }]);
+
+    const optData = {
+      requestType: "VERIFYOTP",
+      otpType: state.otpType,
+      verificationToken: props.state.verificationToken,
+      otp: state.OTPValue,
+      accountNo: state?.accountNo,
+      amount: props?.transactionState?.sendAmount,
+      nickName: props?.transactionState?.nickName,
+    };
+    setLoader(true);
+    hookVerifyOTP
+      .sendRequest(optData, function (res) {
+        // clearInterval(intervalID);
+        setLoader(false);
+        // clearInterval(intervalID);
+        if (res.status == "S") {
+          notification.success({
+            message: res.message,
+            // message: "OTP verified",
+          });
+          clearInterval(intervalID);
+          if (props.useFor === "delete_beneficiary") {
+            props.setState({ _isShowOTPBOX: false });
+            props.deleteBeneficiary();
+          }
+          if (location?.pathname == "/remitter-account-details") {
+            props.setState({ _isShowOTPBOX: false });
+            props.deleteBankAccountDetails();
+          }
+          if (location?.pathname == "/new-transaction") {
+            props.setState({ _isShowOTPBOX: false, isModalVisible: true });
+            // props.ViaCalculateCost();
+            props.bookTransaction();
+          }
+          if (props?.useFor == "login") {
+            props.setState({ verifiedToken: res.verifiedToken, _showSignInForm: false });
+            props.storeLoginData(props.state.loginData);
+            // props.getReceiverLists(props.state.loginData);
+          } else if (props.useFor == "migrated_customer") {
+            props.setState({ verifiedToken: res.verifiedToken, isActive: 3 });
+            props.checkUpdateCRN(props.state.crnDetails);
+          }
+          if (props?.useFor == "forgot_password") {
+            props.setState({
+              verifiedToken: res.verifiedToken,
+              _isShowOTPBOX: false,
+              _setNewPasswordBOX: true,
+            });
+          } else if (props.useFor == "unlock_account") {
+            props.onUnlockAccountHandler();
+          } else if (props.useFor === "edit_receiver") {
+            props.setState({ _isShowOTPBOX: false });
+            props.editReceiver();
+          } else if (props.useFor === "forgot_userId") {
+            props.setState({
+              verifiedToken: res.verifiedToken,
+              _isShowSuccessMessage: true,
+              _isShowOTPBOX: false,
+            });
+          } else if (props.useFor === "reset_password") {
+            props.submitHandler();
+          }
+          if (props?.editProfile) {
+            props.setEditPage(true);
+            props.editProfile(res.verifiedToken);
+            props.setState({ verificationToken: res.verifiedToken });
+          }
+          if (props?.saveReceiver) {
+            props.setReviewPage(true);
+            props.saveReceiver(res.verifiedToken);
+            props.setState({ verificationToken: res.verifiedToken });
+          } else {
+            // signupAccount();
+          }
+        } else {
+          setState({
+            isModalVisible: true,
+            OTPErrorMsg: res.errorMessage,
+            _OTPErrMessage: res.errorMessage,
+            _otpErrMsg: true,
+            _showOtpErrMsg: true,
+          });
+          notification.error({
+            message: res.errorMessage ? res.errorMessage : "Verify OTP failed.",
+          });
+          form.setFields([{ name: "otp", errors: [res.errorMessage] }]);
+          let errors = [];
+          res.errorList.forEach((error, i) => {
+            let errorData = {
+              name: error.field,
+              errors: [error.error],
+            };
+            errors.push(errorData);
+          });
+          if (errors.length > 0) form.setFields(errors);
+        }
+      })
+      .catch((error) => {
+        setLoader(false);
+      });
+  };
+  const signupAccount = (values) => {
+    const signUPData = {
+      loginId: props.state.personalDetails.email,
+      utm_medium: "",
+      bankCustID: props.state.personalDetails.crn,
+      sameBankCust: "Y",
+      emailId: props.state.personalDetails.email,
+      sendCountry: props.state.residentialDetails.country,
+      lpId: "",
+      password: props.state.userPassword,
+      state: props.state.residentialDetails.state,
+      twofa: "N",
+      leadId: props.state.leadId,
+      zip: props.state.residentialDetails.zipcode,
+      marketingRef: "Google~",
+      altMobileNo: "",
+      marketingCommunication: "Y",
+      tnc: "Y",
+      firstName: props.state.personalDetails.firstName,
+      recvCountry: "IN",
+      nationality: "",
+      dob: props.state.dob,
+      pageReferer: "",
+      custType: "INDIVIDUAL",
+      passwordType: "PASSWORD",
+      periodicUpdate: "Y",
+      utm_source: "",
+      lastName: props.state.personalDetails.lastName,
+      gender: props.state.personalDetails.gender,
+      city: props.state.residentialDetails.city,
+      utm_campaig: "",
+      verifiedToken: "",
+      isEmailVerified: "Y",
+      altMobilePhoneCode: "",
+      accountNo: "",
+      euroCountry: "",
+      mobilePhoneCode: props.state.personalDetails.mobileCountryCode,
+      utm_content: "",
+      requestType: "SIGNUP",
+      address2: props.state.residentialDetails.address2,
+      address1: props.state.residentialDetails.address1,
+      // address3: props.state.residentialDetails.address3,
+      utm_adgroup: "",
+      mobileNo: props.state.personalDetails.mobileNo,
+      utm_term: "",
+      middleName: props.state.personalDetails.middleName
+        ? props.state.personalDetails.middleName.trim()
+        : "",
+      isMobileVerified: "N",
+      uniqueIdentifierType: "",
+      uniqueIdentifierValue: "",
+      emailVeriFlag: true, //for send verification email
+      // cifNo: props.state.personalDetails.crn,
+    };
+    setLoader(true);
+    hookSignUp.sendRequest(signUPData, function (data) {
+      setLoader(false);
+      if (data.status == "S") {
+        notification.success({ message: data.message });
+        // props.setState({ activeStepForm: 6 });
+        if (props.state.residentialDetails.country == "US") {
+          signUpViAmerica(data);
+        } else {
+          props.setState({ activeStepForm: 6 });
+        }
+      } else {
+        notification.error({ message: data.errorMessage ? data.errorMessage : "Sign up failed." });
+        let errors = [];
+        data.errorList.forEach((error, i) => {
+          if (error.field == "password") {
+            notification.error({ message: error.error });
+            form.setFields([{ name: "signup_password", errors: [error.error] }]);
+          }
+          let errorData = {
+            name: error.field,
+            errors: [error.error],
+          };
+          errors.push(errorData);
+        });
+
+        if (errors.length > 0) form.setFields(errors);
+      }
+    });
+  };
+  const emailVerify = (data, dataVia) => {
+    let payload = {
+      requestType: "VERIFICATIONEMAIL",
+      loginId: props.state.personalDetails.email,
+      userId: data.userId,
+      emailId: props.state.personalDetails.email,
+    };
+    hookVerifyEmail.sendRequest(payload, function (data) {
+      if (data.status == "S") {
+        notification.success({
+          message: data.message,
+        });
+        // props.setState({activeStepForm:5});
+        // navigate("/verify-email?token=sdfsdfsdf56sdf5s6df5sd6f5sd6");
+      } else {
+        notification.error({
+          message: data.errorMessage ? data.errorMessage : "Verify email failed.",
+        });
+      }
+    });
+  };
+  const signUpViAmerica = (data) => {
+    setLoader(true);
+    hookSignUpViAmerica.sendRequest(
+      {
+        requestType: "SIGNUP",
+        userId: data.userId,
+      },
+      function (dataVia) {
+        setLoader(false);
+        if (dataVia.status === "S") {
+          notification.success({
+            message: "Thank you. You are successfully registered.",
+          });
+          props.setState({ activeStepForm: 6 });
+          emailVerify(data, dataVia);
+        } else {
+          notification.error({
+            message: dataVia.errorMessage ? dataVia.errorMessage : "Signup Via failed.",
+          });
+        }
+      },
+    );
+  };
+  const onClickResedOTP = async () => {
+    const optData = {
+      requestType: "RESENDOTP",
+      verificationToken: props.state.verificationToken,
+      otpOption: "SM",
+      otpService: "EMAIL",
+    };
+
+    setLoader(true);
+    hookReSendOTP
+      .sendRequest(optData, function (res) {
+        setLoader(false);
+
+        if (res.status == "S") {
+          notification.success({ message: "OTP has been sent to your registered email address." });
+          props.setState({ verificationToken: res.verificationToken });
+          setState({ _showOtpErrMsg: "", OTPValue: "" });
+          // setVerificationToken(decodeData.verificationToken);
+          clearInterval(intervalID);
+          setTimeout(() => {
+            reverseTimerOnLoad();
+          }, 200);
+        } else {
+          notification.error({
+            message: res.errorMessage ? res.errorMessage : "Resend OTP failed.",
+          });
+
+          let errors = [];
+          res.errorList.forEach((error, i) => {
+            let errorData = {
+              name: error.field,
+              errors: [error.error],
+            };
+            errors.push(errorData);
+          });
+          if (errors.length > 0) form.setFields(errors);
+        }
+      })
+      .catch((error) => {});
+  };
+  return (
+    <div
+      // className={`h-100 d-flex justify-content-center w-100${
+      //   props?.useFor == "forgot_password" || props?.useFor == "login" ? "" : " px-3"
+      // } `}
+      className={`${location.pathname == "/reset-password" ? "" : "px-md-3"} ${
+        props?.useFor == "migrated_customer" ? "d-flex justify-content-center" : ""
+      }`}
+    >
+      <div
+      // className={` h-100 w-100 ${AuthReducer.isLoggedIn ? "" : "d-flex justify-content-center"}`}
+      >
+        {/* <div className="row h-100">
+          <div className="col-md-6 col-sm-12 col-lg-6 offset-md-3 align-self-center w-100">
+            <div className="CR-otp-form"> */}
+        <Form
+          form={form}
+          onFinish={(values) => {
+            if (state.OTPValue.length === 6) {
+              submitHandler(values);
+            } else {
+              setState({ _otpErrMsg: true });
+              setState({ _showOtpErrMsg: true });
+            }
+          }}
+        >
+          <Spinner spinning={loader}>
+            <div
+              className="CR-otp-form-parent"
+              // className={`CR-otp-form-parent${
+              //   props?.useFor == "forgot_password" || props?.useFor == "login"
+              //     ? ""
+              //     : " margin-opt-minus"
+              // }`}
+              style={{ minHeight: "0px" }}
+            >
+              <div className="CR-otp-form-child">
+                <ul className="row d-flex flex-column align-items-center">
+                  <li className="back-arrow-nav d-xs-block d-done">
+                    <img src={Back_arrow} alt="" />
+                  </li>
+                  <li className="text-center d-sm-done d-xs-block">
+                    <img src={C2R_mobile} style={{ marginBottom: "30px" }} alt="" />
+                  </li>
+                  <li className="col-md-12 col-sm-12 col-lg-12 mb-4">
+                    <h4
+                      style={{ color: "#331114", fontWeight: "700", fontSize: "28px" }}
+                      className="text-center"
+                    >
+                      OTP Verification
+                    </h4>
+                  </li>
+                  <li className="col-md-12 col-sm-12 col-lg-12">
+                    {props?.useFor == "forgot_password" || props?.useFor == "login" ? (
+                      <>
+                        <p className="text-center">
+                          A 6 digit OTP will be sent to <br />
+                          your registered email id.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-center">
+                          Enter the one time password (OTP) sent to <br />
+                          your registered Email ID.
+                          <br />
+                          {/* {props.saveReceiver &&
+                          `+${props?.state?.beneficiaryDetails?.mobileCountryCode} ${props?.state?.beneficiaryDetails?.mobileNo}.`}
+                        {props.editProfile &&
+                          `+${props.state.profileValues.mobileCountryCode} ${props.state.profileValues.mobileNo}.`}
+                        {props?.state?.personalDetails?.mobileCountryCode &&
+                          `+${props?.state?.personalDetails?.mobileCountryCode} ${props?.state?.personalDetails?.mobileNo}.`} */}
+                        </p>
+                      </>
+                    )}
+                  </li>
+                  <li className="col-md-12 col-sm-12 col-lg-12">
+                    <div className="otp-box-input">
+                      <OtpInput
+                        shouldAutoFocus
+                        ref={OtpInputFocus}
+                        value={state.OTPValue}
+                        onChange={(otp) => {
+                          setState({ OTPValue: otp });
+                          if (otp.length == 6) {
+                            setState({ _showOtpErrMsg: "" });
+                          }
+                        }}
+                        numInputs={6}
+                        isInputNum={true}
+                        inputStyle={otpInputStyle}
+                        separator={<span>&nbsp;&nbsp;&nbsp;</span>}
+                        className="cr_otp_input"
+                      />
+                    </div>
+                    {state._otpErrMsg && state._showOtpErrMsg && (
+                      <div
+                        style={{ color: "red" }}
+                        className="d-flex justify-content-center mt-3 text-center"
+                      >
+                        {reverseTimer.trim() == "" ? "" : state._OTPErrMessage}
+                      </div>
+                    )}
+                    {/* <CustomInput
+                    showLabel={false}
+                    name="otp"
+                    label="OTP"
+                    type="text"
+                    min={6}
+                    max={6}
+                    validationRules={[
+                      {
+                        min: 6,
+                        max: 6,
+                        message: "Please enter 6 digit OTP",
+                      },
+                      {
+                        pattern: /^[0-9\b]+$/,
+                        message: "Only Numbers allowed",
+                      },
+                    ]}
+                    required
+                  >
+                    <FloatInput placeholder="OTP" />
+                  </CustomInput> */}
+                    {/* <input
+                    type="password"
+                    className="form-control"
+                    id="floatingPassword"
+                    placeholder="Password"
+                  /> */}
+                  </li>
+                  <li className="text-center" style={{ marginTop: "40px" }}>
+                    <div className="d-flex justify-content-center align-items-center">
+                      <span
+                        style={{ margin: "0 auto" }}
+                        onClick={onClickResedOTP}
+                        className="resendotp"
+                      >
+                        Resend OTP
+                      </span>
+                    </div>
+                    <p className="mt-2 text-center">
+                      {reverseTimer.trim() == "" ? (
+                        <small>OTP expired.</small>
+                      ) : (
+                        <small>OTP will expire in {reverseTimer}</small>
+                      )}
+                    </p>
+                    {/* <a href="#!" className="resendotpcount">
+                      Resend <br />
+                      45s
+                    </a> */}
+                  </li>
+                </ul>
+              </div>
+              <div className="bottom_panel-otp-box p-0">
+                <div className="d-flex justify-content-between align-items-center w-100">
+                  <div
+                    className="Back_arrow d-flex align-items-center"
+                    onClick={() => {
+                      if (props?.useFor == "login") {
+                        props.setState({ _showSignInForm: true });
+                      }
+                      if (props?.saveReceiver) {
+                        props.setReviewPage(true);
+                      } else if (props?.editProfile) {
+                        props.setEditPage(true);
+                      } else {
+                        props.setState({ activeStepForm: 3 });
+                      }
+                      if (location.pathname == "/forgot-password") {
+                        props.setState({ _isShowSuccessMessage: true, _isShowOTPBOX: false });
+                      } else if (props.useFor == "unlock_account") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (location.pathname == "/new-transaction") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (props.useFor === "edit_receiver") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (props.useFor === "delete_beneficiary") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (location?.pathname == "/remitter-account-details") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (props.useFor === "forgot_userId") {
+                        props.setState({ _isShowOTPBOX: false });
+                      } else if (props.useFor == "migrated_customer") {
+                        // props.gotoSignin({ isMigrated: false });
+                        // props.gotoSignin({ isMigrated: false, _isShowSuccessMessage: true });
+                        props.setState({ isActive: 3 });
+                      } else if (props.useFor == "reset_password") {
+                        props.setState({ isStep: 2 });
+                      }
+                    }}
+                  >
+                    <img src={Back_arrow} alt="backArrow" /> Back
+                  </div>
+                  <button
+                    htmlType="submit"
+                    className="btn btn-primary CR-primary-btn"
+                    style={{ width: "100px", margin: "0 !important" }}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Spinner>
+        </Form>
+      </div>
+
+      {state.isModalVisible && (
+        <>
+          <div class="modal CR-OTP-modal fade show" tabindex="-1">
+            <div class="modal-dialog-centered  modal-width" style={{ margin: "0 auto" }}>
+              <div class="modal-content">
+                <div class="modal-body CR-OTP-modal-container">
+                  <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                    onClick={() => setState({ isModalVisible: false })}
+                  ></button>
+                  <h5>Invalid Otp</h5>
+                  {/* <p class="error">This is you final attempt</p> */}
+                  <p>{state.OTPErrorMsg}</p>
+                  <div class="btn-modal-wrapper">
+                    <a onClick={() => setState({ isModalVisible: false })} class="modal-btn">
+                      Got It
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-backdrop fade show"></div>
+        </>
+      )}
+    </div>
+  );
+}
