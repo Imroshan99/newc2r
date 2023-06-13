@@ -1,0 +1,38 @@
+https://qaone.remit.in/services/usr/get-senderkyc-details
+
+{
+    "requestId": "24GoQK7RBV",
+    "channelId": "WEB",
+    "clientId": "C2R",
+    "groupId": "C2R",
+    "sessionId": "p6xICWSg6XGHEybkqhNHpaJc464zqYgCyFEzOvN8rxNpKRte2e",
+    "ipAddress": "127.0.0.1",
+    "requestType": "SENDERKYCDTLS",
+    "userId": "8207151270"
+}
+
+{
+    "responseId": "6291219",
+    "requestId": "24GoQK7RBV",
+    "responseType": "SENDERKYCDTLS",
+    "groupId": "C2R",
+    "token": null,
+    "status": "S",
+    "message": null,
+    "errorCode": null,
+    "errorMessage": null,
+    "errorList": null,
+    "jumioStatus": "",
+    "jumioReferenceId": "",
+    "isIfrKycDone": "N",
+    "isWiseKycDone": "N",
+    "isViaKycDone": "N",
+    "isJumioDone": "N",
+    "isMigratedKycDone": "N",
+    "isMobileVerified": " ",
+    "isEmailVerified": " ",
+    "passportExpiryDt": null,
+    "isCompDtlsAdded": "N",
+    "isDirDtlsAdded": "N",
+    "isFirstTimeUser": "Y"
+}
