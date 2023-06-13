@@ -1,0 +1,71 @@
+https://qaone.remit.in/services/txn/vi-america-signin
+
+{
+    "requestId": "45iueTnwM1",
+    "channelId": "WEB",
+    "clientId": "CGPN",
+    "groupId": "CGPN",
+    "sessionId": "hW56QLd7GCQoEyhqFCflfh0t4G4YJxl6xO4oVymhsX8lDaMOFG",
+    "ipAddress": "127.0.0.1",
+    "requestType": "LOGIN",
+    "userId": "5189151267"
+}
+
+{
+    "responseId": "6290317",
+    "requestId": "2v5hbrSZYl",
+    "responseType": "LOGIN",
+    "groupId": "CGPN",
+    "token": null,
+    "status": "F",
+    "message": "OTP Sent",
+    "errorCode": null,
+    "errorMessage": "wrong cookie",
+    "errorList": null,
+    "conversionRate": null,
+    "minAmount": null,
+    "maxAmount": null,
+    "loginTokenId": null,
+    "idSenderGlobal": null,
+    "linkToken": null,
+    "accessToken": null,
+    "itemId": null,
+    "bankResponse": null,
+    "eventId": "2fbaa79a-a618-4a5f-9004-c3dbbc979cc9",
+    "tokenExpiredTime": null,
+    "fee": null
+}
+
+
+----------------------------------------------------------------------
+https://qaone.remit.in/services/usr/check-dedupe
+
+{
+    "requestId": "cNNFzsn0DK",
+    "channelId": "WEB",
+    "clientId": "CGPN",
+    "groupId": "CGPN",
+    "sessionId": "wXUDYv4WzeJGVyL3KrNkfB5b1OLmUmFRkgbQe6MbPqLlPaSqZC",
+    "ipAddress": "127.0.0.1",
+    "requestType": "DEDUPECHECK",
+    "firstName": "Roshan",
+    "lastName": "Tambe",
+    "emailId": "roshan7@yopmail.com",
+    "mobilePhoneCode": "91",
+    "mobileNo": "9021608868",
+    "dob": "2005-06-01",
+    "countryCode": "US"
+}
+
+{
+    "responseId": "6290536",
+    "requestId": "cNNFzsn0DK",
+    "responseType": "DEDUPECHECK",
+    "groupId": "CGPN",
+    "token": null,
+    "status": "F",
+    "message": null,
+    "errorCode": "9012",
+    "errorMessage": "You are already registered with us, request you to <ForgotPassword>click here</ForgotPassword> in case you have forgotten your password or <ForgotUserId>click here</ForgotUserId> to retrieve your user name. Terms and Conditions applicable.",
+    "errorList": null
+}
