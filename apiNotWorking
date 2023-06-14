@@ -86,3 +86,47 @@ https://qaone.remit.in/services/txn/vi-america-price-quote
     "checkLimitExceed": null,
     "calculateCostId": null
 }
+
+
+-----------------------------------------
+https://qaone.remit.in/services/txn/vi-america-createlinktoken
+
+{
+    "requestId": "3GfRi5FVDl",
+    "channelId": "WEB",
+    "clientId": "CGPN",
+    "groupId": "CGPN",
+    "sessionId": "olf0hLDpItQSo8NPn59WDhAPsRx4hmGOACLmjGoPczioRitI2s",
+    "ipAddress": "127.0.0.1",
+    "requestType": "VIALINKTOKENCREATE",
+    "userId": "5531151285",
+    "emailId": "ROSHAN12@YOPMAIL.COM",
+    "method": "POST",
+    "loginToken": "null",
+    "idSenderGlobal": "null"
+}
+
+{
+    "responseId": "6300778",
+    "requestId": "3GfRi5FVDl",
+    "responseType": "VIALINKTOKENCREATE",
+    "groupId": "CGPN",
+    "token": null,
+    "status": "F",
+    "message": null,
+    "errorCode": "4003",
+    "errorMessage": "VIA Token Expired",
+    "errorList": null,
+    "conversionRate": null,
+    "minAmount": null,
+    "maxAmount": null,
+    "loginTokenId": null,
+    "idSenderGlobal": null,
+    "linkToken": null,
+    "accessToken": null,
+    "itemId": null,
+    "bankResponse": null,
+    "eventId": null,
+    "tokenExpiredTime": null,
+    "fee": null
+}
