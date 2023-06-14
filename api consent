@@ -1,0 +1,26 @@
+Hi Sanjay/Roshan,
+
+Kindly implement the customer consent requirement with the below api. Consents are in the trail mail.
+
+https://ifruat.indusind.com/services/usr/add-consent
+
+{
+    "consentFrom": "POSTLOGIN",
+    "clientId": "IFR",
+    "requestType": "ADDCONSENT",
+    "groupId": "IFR",
+    "isConsentCheck": "Y",
+    "ipAddress": "10.96.0.10",
+    "fullName": "RAMESH VERMA",
+    "emailId": "RAMESHV0921@YOPMAIL.COM",
+    "sessionId": "5RC0BY7ckyCV9JL0_xgg_HCkwMmUQUSsvzjYPzRk",
+    "mobileNo": "91-8652149458",
+    "userId": "9161144043",
+    "requestId": "1452",
+    "countryCode": "US",
+    "consentType": "TXNREVIEWTNC",
+    "rgtn": "",
+    "consentLocation": "TXNREVIEW",
+    "channelId": "WEB"
+}
+Let me know if you have any queries
