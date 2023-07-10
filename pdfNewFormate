@@ -1,0 +1,313 @@
+import React, { createRef, useState, forwardRef } from "react";
+import ThirdrdPageImg from "./pdf/3rd.png";
+import header from "./pdf/Header.png";
+import footer from "./pdf/Footer.png";
+import Opensans from "../../assets/fonts/hdfc/OpenSans-Regular.ttf";
+import Opensansbold from "../../assets/fonts/hdfc/OpenSans-Bold.ttf";
+import Opensansmedium from "../../assets/fonts/hdfc/OpenSans-Medium.ttf";
+
+import { Page, Text, View, Document, StyleSheet, Image, Font } from "@react-pdf/renderer";
+
+const WisePdf = (props, ref) => {
+  const invRef = createRef();
+  const { wiseTransactionInformation } = props;
+
+  Font.register({ family: "Open sans", format: "truetype", src: Opensans });
+  Font.register({ family: "Open sans bold", format: "truetype", src: Opensansbold });
+  Font.register({ family: "Open sans med", format: "truetype", src: Opensansmedium });
+
+  const ThirdrdPage = () => (
+    <Document ref={ref}>
+      <Page ref={invRef}>
+        <Image src={header} style={styles.image} />
+        {/* transafer online start */}
+        <Text style={[styles.label_title, styles.border_bottom, styles.padding_para]}>Transfer Confirmation</Text>
+        <View>
+          {/* 1st row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Funded</Text>
+            <Text style={[styles.fontText, styles.cell]}>Paid out</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>{`${wiseTransactionInformation?.wiseTransactionUserData?.amtArrivedDate?.split('.')[0]}`}</Text>
+            <Text style={[styles.tableText, styles.cell]}>{`${wiseTransactionInformation?.wiseTransactionUserData?.payDate?.split('.')[0]}`}</Text>
+          </View>
+          {/* 1st row end*/}
+          {/* 2nd row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Funds available</Text>
+            <Text style={[styles.fontText, styles.cell]}>Transfer</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>{`${wiseTransactionInformation?.wiseTransactionUserData?.fundsAvailableDate ? wiseTransactionInformation?.wiseTransactionUserData?.fundsAvailableDate?.split('.')[0] : ""}`}</Text>
+            <Text style={[styles.tableText, styles.cell]}>{`#${wiseTransactionInformation?.wiseTransactionUserData?.wisetransactiondid}`}</Text>
+          </View>
+          {/* 2nd row end*/}
+          {/* 3rd row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Membership</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>{`P${wiseTransactionInformation?.senderData?.wiseProfileId}`}</Text>
+          </View>
+          {/* 3rd row end*/}
+        </View>
+
+        {/* transfer online end */}
+        {/* your Details start */}
+        <Text style={[styles.label_title, styles.border_bottom, styles.padding_para]}>Your Details</Text>
+        <View>
+          {/* 1st row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Name</Text>
+            <Text style={[styles.fontText, styles.cell]}>Address</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table, styles.lineHeight20]}>
+            <Text style={[styles.tableText, styles.cell]}>{`${wiseTransactionInformation?.senderData?.firstName ? wiseTransactionInformation?.senderData?.firstName : ""} ${wiseTransactionInformation?.senderData?.middleName ? wiseTransactionInformation?.senderData?.middleName : ""} ${wiseTransactionInformation?.senderData?.lastName ? wiseTransactionInformation?.senderData?.lastName : ""}`}</Text>
+            <Text style={[styles.tableText, styles.cell, styles.d_block, styles.lineHeight20]}>{wiseTransactionInformation?.senderData?.address1}</Text>
+          </View>
+          {/* <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}></Text>
+            <Text style={[styles.tableText, styles.cell,styles.d_block]}>
+             {wiseTransactionInformation?.senderData?.address2}
+            </Text>
+          </View> */}
+          <View style={[styles.row, styles.padding_para_table, styles.lineHeight20]}>
+            <Text style={[styles.tableText, styles.cell]}></Text>
+            <Text style={[styles.tableText, styles.cell, styles.lineHeight30]}>
+              {wiseTransactionInformation?.senderData?.cityName}, {wiseTransactionInformation?.senderData?.zip}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell, styles.lineHeight30]}></Text>
+            <Text style={[styles.tableText, styles.cell, styles.lineHeight30]}>{`${wiseTransactionInformation?.senderData?.stateName}, ${wiseTransactionInformation?.senderData?.sendCountryName}`}</Text>
+          </View>
+          {/* 1st row end*/}
+        </View>
+        {/* Your Detaills end */}
+        {/* transafer overview start */}
+        <Text style={[styles.label_title, styles.border_bottom, styles.padding_para]}>Transfer Overview</Text>
+        <View>
+          {/* 1st row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Amount Paid by {`${wiseTransactionInformation?.senderData?.firstName ? wiseTransactionInformation?.senderData?.firstName : ""} ${wiseTransactionInformation?.senderData?.middleName ? wiseTransactionInformation?.senderData?.middleName : ""} ${wiseTransactionInformation?.senderData?.lastName ? wiseTransactionInformation?.senderData?.lastName : ""}`}</Text>
+            <Text style={[styles.fontText, styles.cell]}>
+              Fee &nbsp;&nbsp;{wiseTransactionInformation?.wiseTransactionUserData?.fee ? wiseTransactionInformation?.wiseTransactionUserData?.fee : "0"} {wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>
+              {wiseTransactionInformation?.wiseTransactionUserData?.sendAmount} {wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency}
+            </Text>
+            <Text style={[styles.tableText, styles.cell]}>
+              Payin {wiseTransactionInformation?.wiseTransactionUserData?.feePayin ? wiseTransactionInformation?.wiseTransactionUserData?.feePayin : "0"} {wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}> </Text>
+            <Text style={[styles.tableText, styles.cell]}>
+              Conversion {wiseTransactionInformation?.wiseTransactionUserData?.feeConversion ? wiseTransactionInformation?.wiseTransactionUserData?.feeConversion : "0"} {wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Transfer Amount </Text>
+            <Text style={[styles.fontText, styles.cell]}>Exchange Rate </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>
+              {wiseTransactionInformation?.wiseTransactionUserData?.transferAmount ? wiseTransactionInformation?.wiseTransactionUserData?.transferAmount : ""} {wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency}
+            </Text>
+            <Text style={[styles.tableText, styles.cell]}>{` 1.0000 ${wiseTransactionInformation?.wiseTransactionUserData?.enteredAmtCurrency} = ${wiseTransactionInformation?.wiseTransactionResponse?.rate} ${wiseTransactionInformation?.wiseTransactionUserData?.recvCountry?.split("-")[1]}`}</Text>
+          </View>
+
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Converted and sent to {wiseTransactionInformation?.wiseTransactionUserData?.receiverName} </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>
+              {wiseTransactionInformation?.wiseTransactionUserData?.recvAmount} {wiseTransactionInformation?.wiseTransactionUserData?.recvCountry?.split("-")[1]}
+            </Text>
+          </View>
+          {/* 1st row end*/}
+        </View>
+
+        {/* transfer online end */}
+
+        <Image src={footer} style={[styles.margintopfirst]} />
+        <View style={styles.breakable} />
+        <Image src={header} />
+        {/* transafer online start */}
+        <Text style={[styles.label_title, styles.border_bottom, styles.padding_para]}>Sent To</Text>
+        <View>
+          {/* 1st row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Name</Text>
+            <Text style={[styles.fontText, styles.cell]}>Reference</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell]}>{wiseTransactionInformation?.wiseTransactionUserData?.receiverName}</Text>
+            <Text style={[styles.tableText, styles.cell]}>{wiseTransactionInformation?.wiseTransactionUserData?.subPurposeDesc}</Text>
+          </View>
+          {/* 1st row end*/}
+          {/* 2nd row start*/}
+          <View style={[styles.row, styles.padding_para_table, styles.margin_top]}>
+            <Text style={[styles.fontText, styles.cell]}>Account details</Text>
+            <Text style={[styles.fontText, styles.cell]}>Address</Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table, styles.lineHeight20]}>
+            <Text style={[styles.tableText, styles.cell]}>{wiseTransactionInformation?.wiseTransactionUserData?.recvIFSCCode}</Text>
+            <Text style={[styles.tableText, styles.cell, styles.lineHeight20,styles.d_block]}>
+              {wiseTransactionInformation?.wiseTransactionUserData?.recvAddress}&nbsp;
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table,styles.marginTop20]}>
+            <Text style={[styles.tableText, styles.cell]}>{wiseTransactionInformation?.wiseTransactionUserData?.recvAccNumber}</Text>
+            <Text style={[styles.tableText, styles.cell,styles.lineHeight20]}>
+            {wiseTransactionInformation?.wiseTransactionUserData?.recvAddress2}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell,styles.lineHeight20]}></Text>
+            <Text style={[styles.tableText, styles.cell,styles.lineHeight30]}>
+              {wiseTransactionInformation?.wiseTransactionUserData?.recvCity},{wiseTransactionInformation?.wiseTransactionUserData?.recvZipCode}
+            </Text>
+          </View>
+          <View style={[styles.row, styles.padding_para_table]}>
+            <Text style={[styles.tableText, styles.cell,styles.lineHeight20]}></Text>
+            <Text style={[styles.tableText, styles.cell,styles.lineHeight20]}>{wiseTransactionInformation?.wiseTransactionUserData?.recvState}&nbsp;India</Text>
+          </View>
+          {/* 2nd row end*/}
+        </View>
+
+        {/* transfer online end */}
+        <Image src={footer} style={[styles.margintopsecond]} />
+        <Image src={ThirdrdPageImg} />
+      </Page>
+    </Document>
+  );
+
+  const styles = StyleSheet.create({
+    page: {},
+    label_title: {
+      paddingTop: 40,
+      fontFamily: "Open sans bold",
+      fontSize: 12,
+      lineHeight: 2,
+    },
+    margin_top: {
+      marginTop: 10,
+    },
+    padding_para: {
+      marginLeft: 30,
+      marginRight: 30,
+    },
+    padding_para_table: {
+      marginLeft: 40,
+      marginRight: 40,
+    },
+    border_bottom: {
+      paddingBottom: 10,
+      borderBottom: 1,
+      borderColor: "grey",
+    },
+    marginTop20:{
+    marginTop:20,
+    },
+    label_content: {
+      marginLeft: 70,
+      marginRight: 70,
+      paddingTop: 35,
+      fontFamily: "Open sans",
+    },
+    d_block: {
+      display: "block",
+    },
+
+    breakable: { width: "100%", height: 10 },
+    unbreakable: { width: "100%", height: 100 },
+    table: {
+      fontSize: 10,
+      width: 550,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-start",
+      alignContent: "stretch",
+      flexWrap: "nowrap",
+      alignItems: "stretch",
+    },
+    row: {
+      display: "flex",
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignContent: "stretch",
+      flexWrap: "nowrap",
+      alignItems: "stretch",
+      flexGrow: 0,
+      flexShrink: 0,
+      flexBasis: 20,
+    },
+    cell: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: "auto",
+      alignSelf: "stretch",
+    },
+
+    headerText: {
+      fontSize: 12,
+      fontWeight: 1200,
+      color: "#1a245c",
+      margin: 2,
+    },
+    tableText: {
+      // margin: 5,
+      fontSize: 8.3,
+      color: "#000000",
+      fontFamily: "Open sans med",
+    },
+    fontTextBottom: {
+      fontFamily: "Open sans med",
+      fontSize: 7,
+      textAlign: "center",
+      color: "#5C737F",
+      paddingTop: 30,
+      marginLeft: 15,
+      marginRight: 15,
+    },
+    fontText: {
+      color: "#5C737F",
+      fontFamily: "Open sans med",
+      fontSize: 10,
+    },
+    margintopfirst: {
+      marginTop: 40,
+    },
+    margintopsecond: {
+      marginTop: 300,
+    },
+    image: {
+      objectFit: "cover",
+      height: "92px",
+    },
+    lineHeight30: {
+      paddingTop: "30px",
+    },
+    lineHeight10: {
+      paddingTop: "10px",
+    },
+
+    // // lineHeight20: {
+    //   paddingTop: "20px",
+    // // },
+    //lineHeight20:{
+    //  lineHeight:40,
+    // },
+    // lineHeight30:{
+    //   lineHeight:30,
+    // }
+  });
+
+  return <ThirdrdPage />;
+};
+
+export default forwardRef(WisePdf);
